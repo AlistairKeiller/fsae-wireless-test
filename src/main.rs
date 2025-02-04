@@ -1,23 +1,29 @@
-mod client;
 mod mqtt;
-mod server;
+mod poster;
+mod subscriber;
 use clap::Parser;
-use server::post;
-use client::subscriber;
+use poster::post;
+use subscriber::subscribe;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long)]
-    server: bool,
+    #[arg(long)]
+    post: bool,
 
-    #[arg(short, long, default_value_t = 8, requires = "server")]
+    #[arg(long)]
+    subscribe: bool,
+
+    #[arg(long)]
+    broker: bool,
+
+    #[arg(long, default_value_t = 8, requires = "post")]
     payload: usize,
 
-    #[arg(short, long, default_value = "127.0.0.1")]
+    #[arg(long, default_value = "127.0.0.1")]
     ip: String,
 
-    #[arg(short, long, default_value_t = 10)]
+    #[arg(long, default_value_t = 100)]
     queue: usize,
 }
 
@@ -25,14 +31,14 @@ struct Args {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
 
-    println!("{:?}", args);
-
-    if args.server {
+    if args.broker {
         std::thread::spawn(mqtt::mqttd);
-
-        tokio::spawn(post(args.queue, args.payload, args.ip));
-    } else {
-        tokio::spawn(subscriber(args.queue, args.ip));
+    }
+    if args.post {
+        tokio::spawn(post(args.queue, args.payload, args.ip.clone()));
+    }
+    if args.subscribe {
+        tokio::spawn(subscribe(args.queue, args.ip));
     }
 
     tokio::signal::ctrl_c().await?;
